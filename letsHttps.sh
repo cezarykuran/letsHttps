@@ -6,22 +6,23 @@ pgname=$(basename $0)
 wd=$(dirname $0)
 sslDir='ssl'
 
+
 help() {
     echo "Usage:"
     echo "$pgname -d domain -a pathToAcmeDir [-s subdomain1] [-s subdomain2]"
     echo
     echo "Example:"
-    echo "$pgname -d domain.com -p /var/www/htdocs/domain.com/.well-known/acme-challenge/ -s www -s forum -s www.forum"
+    echo "$pgname -d domain.com -a /var/www/htdocs/domain.com/.well-known/acme-challenge/ -s www -s forum -s www.forum"
     echo
     exit
 }
 
 
-echo '  _       _    _____  _    _'
-echo ' | | ___ | |_ |  |  || |_ | |_  ___  ___ '
-echo ' | || -_||  _||     ||  _||  _|| . ||_ -|'
-echo ' |_||___||_|  |__|__||_|  |_|  |  _||___|'
-echo '                          |_|'
+echo ' _     _       _____ _   _'
+echo '| |___| |_ ___|  |  | |_| |_ ___ ___'
+echo '| | -_|  _|_ -|     |  _|  _| . |_ -|'
+echo '|_|___|_| |___|__|__|_| |_| |  _|___|'
+echo '                            |_|'
 echo
 
 

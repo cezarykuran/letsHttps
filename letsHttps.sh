@@ -4,42 +4,36 @@ set -e
 
 pgname=$(basename $0)
 wd=$(dirname $0)
+
 sslDir='ssl'
 
 
 help() {
     echo "Usage:"
-    echo "$pgname -d domain -a pathToAcmeDir [-s subdomain1] [-s subdomain2]"
+    echo "$pgname -a pathToAcmeDir [-n name] -d domain.com [-d subdomain.domain.com] [-d anotherdomain.com]"
     echo
     echo "Example:"
-    echo "$pgname -d domain.com -a /var/www/htdocs/domain.com/.well-known/acme-challenge/ -s www -s forum -s www.forum"
+    echo "$pgname -a /var/www/htdocs/domain.com/.well-known/acme-challenge/ -d domain.com -d www.domain.com"
     echo
     exit
 }
 
 
-echo ' _     _       _____ _   _'
-echo '| |___| |_ ___|  |  | |_| |_ ___ ___'
-echo '| | -_|  _|_ -|     |  _|  _| . |_ -|'
-echo '|_|___|_| |___|__|__|_| |_| |  _|___|'
-echo '                            |_|'
-echo
-
-
-domain=''
 acmeDir=''
-subdomains=()
+name=''
+domains=()
 
-while getopts ":d:a:s:h" opt; do
+while getopts ":n:d:a:s:h" opt; do
     case $opt in
-        d)
-            domain="$OPTARG"
-            ;;
-        s)
-            subdomains+=("$OPTARG")
-            ;;
         a)
             acmeDir="$OPTARG"
+            ;;
+        n)
+            name="$OPTARG"
+            ;;
+        d)
+            domains+=("$OPTARG")
+            test -z "$name" && name="$OPTARG"
             ;;
         h)
             help
@@ -56,20 +50,26 @@ while getopts ":d:a:s:h" opt; do
     esac
 done
 
-test -z "$domain" && {
-    echo -e "$pgname error: empty domain name.\nTry -h for help.\n" >&2
+e=''
+test -z "$acmeDir" && e="$e -empty acme dir\n";
+test -z "$name" && e="$e -empty cert/key name\n";
+test ${#domains[@]} -eq 0 && e="$e -empty domain name\n";
+test -n "$e" && {
+    echo -e "$pgname error:\n$e\nTry -h for help.\n" >&2
     exit 1
 }
 
-test -z "$acmeDir" && {
-    echo -e "$pgname error: empty acme dir.\nTry -h for help.\n" >&2
-    exit 1
-}
 
-echo    "domain     : $domain"
-echo -n "subdomains : "; test ${#subdomains[@]} -gt 0 && echo "${subdomains[@]}" || echo '-'
-echo    "acme dir   : $acmeDir"
 echo
+echo "acme dir : $acmeDir"
+echo "name     : $name"
+echo "domains  : ${domains[@]}"
+echo
+
+e=''
+for domain in "${domains[@]}"; do test $($wd/getent hosts $domain | awk '{ print $1 }') != '127.0.0.1' && e="$e -$domain\n"; done
+test -n "$e" && echo -e "Warning, not 127.0.0.1 domains:\n$e"
+
 read -p "continue [y/n]? " -n1 yn
 echo
 test "$yn" == 'y' || exit 0
@@ -89,16 +89,8 @@ test ! -d 'acme-tiny-master' && {
 
 test ! -f 'account.key' && {
     echo 'Generating account.key..'
-    openssl genrsa 4096 > "$sslDir/account.key"
+    openssl genrsa 4096 > "account.key"
     echo
-}
-
-domains=""
-test ${#subdomains[@]} -gt 0 && {
-    for subdomain in "${subdomains[@]}"; do
-        domains="$domains,DNS:$subdomain.$domain"
-    done
-    domains="DNS:$domain$domains"
 }
 
 test ! -d "$acmeDir" && {
@@ -107,22 +99,24 @@ test ! -d "$acmeDir" && {
 }
 
 echo 'Generating private key..'
-openssl genrsa 4096 > "$sslDir/$domain.key"
+openssl genrsa 4096 > "$sslDir/$name.key"
 
 echo 'Generating certificate signing request..'
-test -n "$domains" && {
-    openssl req -new -sha256 -key "$sslDir/$domain.key" -subj "/" -reqexts SAN -config <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=$domains")) > "$sslDir/$domain.csr"
+test ${#domains[@]} -gt 1 && {
+    for domain in "${domains[@]}"; do SAN="$SAN,DNS:$domain"; done; SAN=${SAN:1}
+    openssl req -new -sha256 -key "$sslDir/$name.key" -subj "/" -reqexts SAN -config <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=$SAN")) > "$sslDir/$name.csr"
 } || {
-    openssl req -new -sha256 -key "$sslDir/$domain.key" -subj "/CN=$domain" > "$sslDir/$domain.csr"
+    CN="${domains[0]}"
+    openssl req -new -sha256 -key "$sslDir/$name.key" -subj "/CN=$CN" > "$sslDir/$name.csr"
 }
 echo
 
 echo 'Generating certificate request..'
-python acme-tiny-master/acme_tiny.py --account-key account.key --csr "$sslDir/$domain.csr" --acme-dir "$acmeDir" > "$sslDir/$domain.crt"
-
+python acme-tiny-master/acme_tiny.py --account-key account.key --csr "$sslDir/$name.csr" --acme-dir "$acmeDir" > "$sslDir/$name.crt"
 echo
-echo "Output files in '$sslDir':"
-ls "$sslDir" | grep "$domain"
 
+echo "Output files:"
+ls "$sslDir/$name"*
 echo
+
 echo 'Bye!!'

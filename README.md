@@ -3,5 +3,4 @@ This is the helper bash script for [**acme-tiny**](https://github.com/diafygi/ac
 
 ## How to use
 Example:  
-letsHttps.sh -d domain.com -a /var/www/htdocs/domain.com/.well-known/acme-challenge/ -s www -s forum -s www.forum
-
+letsHttps.sh  -a /var/www/htdocs/domain.com/.well-known/acme-challenge/ [-n key-cert-name] -d domain.com [-d www.domain.com] [-d otherdomain.com]
